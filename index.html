@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ja-JP">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>arc-dot-interaction-js</title>
+</head>
+
+<body>
+  <canvas id="canvas" width="800" height="800"></canvas>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const canvasWidth = 800, canvasHeight = 800;
+    const deg2rad = (deg) => deg * (Math.PI / 180);
+    const rad2deg = (rad) => rad * (180 / Math.PI);
+    const orgfloor = (value, base = 10) => Math.floor(value * base) / base;
+    const randomMinMax = (min, max) => Math.random() * (max - min) + min;
+    const context = canvas.getContext('2d');
+    let lastFrameTime = performance.now();
+    let frameCount = 0;
+    let fps = 0;
+    let mousePos = {x:-100, y:0};
+
+    class Vector {
+      constructor(x = 0, y = 0) {
+        this.x = x;
+        this.y = y;
+      }
+      draw(context, v0, width, color='#00ff00') {
+        context.beginPath();
+        context.moveTo(v0.x, v0.y);
+        context.lineTo(v0.x + this.x, v0.y + this.y);
+        context.strokeStyle = color;
+        context.lineWidth = width;
+        context.stroke();
+      }
+      length() {
+        return Math.sqrt(this.x * this.x + this.y * this.y);
+      }
+      normalize() {
+        let len = this.length();
+        return new Vector(this.x / len, this.y / len);
+      }
+      scale(factor) {
+        return new Vector(this.x * factor, this.y * factor);
+      }
+      distance(vector) {
+        return new Vector(this.x - vector.x, this.y - vector.y);
+      }
+    }
+
+    class Arc {
+      constructor(x, y, radius, startAngle, endAngle) {
+        this.x = x;
+        this.y = y;
+        this.radius = radius;
+        this.startAngle = startAngle;
+        this.endAngle = endAngle;
+      }
+      draw(context, color='#f3f3f3') {
+        context.beginPath();
+        context.moveTo(this.x, this.y);
+        context.fillStyle = color;
+        context.arc(this.x, this.y, this.radius, this.startAngle, this.endAngle, false);
+        context.fill();
+      }
+    }
+
+    const arcCenterPos = new Vector(canvasWidth / 2, canvasHeight / 2);
+    const arcStartAngle = (randomMinMax(-Math.PI, Math.PI));
+    const arcEndAngle = (randomMinMax(arcStartAngle, Math.PI));
+
+    let arc = new Arc(
+      arcCenterPos.x, arcCenterPos.y, 350, 
+      arcStartAngle, arcEndAngle
+    );
+
+    let gameLoop = function () {
+      const currentTime = performance.now();
+      const deltaTime = (currentTime - lastFrameTime) / 1000; // ミリ秒を秒に変換
+
+      // ここにゲームの更新処理を追加
+
+      // キャンバスのクリア
+      context.clearRect(0, 0, canvasWidth, canvasHeight);
+      context.fillStyle = '#000000';
+      context.fillRect(0, 0, canvasWidth, canvasHeight);
+
+      // 扇形を二等分するベクトルを作成する
+      const arcMidRadian = (arc.startAngle + arc.endAngle) / 2;
+      let arcDirectionVector = new Vector(Math.cos(arcMidRadian), Math.sin(arcMidRadian));
+      arcDirectionVector = arcDirectionVector.normalize();
+
+      // 弧を描画
+      arc.draw(context);
+      // マウス位置を描画
+      {
+        const radius = 3;
+        context.beginPath();
+        context.fillStyle = '#ff0000';
+        context.arc(mousePos.x, mousePos.y, radius, 0, Math.PI * 2, false);
+        context.fill();
+      }
+      // 扇形を二等分するベクトルを描画
+      arcDirectionVector.scale(arc.radius).draw(context, arcCenterPos, 2);
+
+      // 円弧と点の当たり判定
+      let arcToPoint = arcCenterPos.distance(mousePos);
+      let arcToPointNormalized = arcToPoint.normalize();
+      let dot = arcToPointNormalized.x * arcDirectionVector.x + arcToPointNormalized.y * arcDirectionVector.y;
+      let cos = Math.cos((arc.endAngle + Math.PI - arc.startAngle + Math.PI) / 2);
+      let isHit = dot < cos && arcToPoint.length() <= arc.radius;
+
+      // FPS 計測と表示
+      frameCount++;
+      if (currentTime >= lastFrameTime + 1000) {
+        fps = frameCount;
+        frameCount = 0;
+        lastFrameTime = currentTime;
+      }
+
+      // FPS をキャンバスに描画
+      context.fillStyle = '#ffffff';
+      context.font = "14px Arial";
+      let textHeight = 20;
+      let textY = 5;
+      context.fillText(`FPS: ${fps}`, 15, (textY += textHeight));
+      (textY += textHeight);
+      context.fillText(`Arc center point distance: ${orgfloor(arcToPoint.length())}`, 15, (textY += textHeight));
+      context.fillText(`Arc start: ${orgfloor(rad2deg(arc.startAngle))} end: ${orgfloor(rad2deg(arc.endAngle))}`, 15, (textY += textHeight));
+      context.fillText(`Arc direction dot: ${orgfloor(dot, 1000)}`, 15, (textY += textHeight));
+      context.fillText(`Arc radian cos ${orgfloor(cos, 1000)}`, 15, (textY += textHeight));
+      if (isHit) context.fillStyle = '#ff0000';
+      context.fillText(`Hit: ${isHit}`, 15, (textY += textHeight));
+
+      requestAnimationFrame(gameLoop);
+    }
+    requestAnimationFrame(gameLoop);
+
+    canvas.addEventListener('mousemove', function (evt) {
+      let getMousePosition = (canvas, evt) => {
+        let rect = canvas.getBoundingClientRect();
+        return {
+          x: evt.clientX - rect.left,
+          y: evt.clientY - rect.top
+        };
+      }
+      mousePos = getMousePosition(canvas, evt);
+    }, false);
+  </script>
+</body>
+
+</html>
